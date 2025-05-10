@@ -2,7 +2,7 @@ import pygame
 import random
 import math
 import Button_dead as Button
-
+import time as python
 pygame.init()
 
 WIDTH, HEIGHT = 800, 600
@@ -116,7 +116,7 @@ class boss(pygame.sprite.Sprite):
         self.image.fill(RED)
         self.rect = self.image.get_rect(center=(random.randint(1999, 2000), 500))
         self.speed = 2
-        self.health = 500
+        self.health = 200
         self.damage = 50
         self.last_attack_time = 0
         self.attack_cooldown = 2000
@@ -135,17 +135,30 @@ class boss(pygame.sprite.Sprite):
         bullet = Bullet(self.rect.centerx, self.rect.centery, player.rect.centerx, player.rect.centery, RED)
         boss_bullets.add(bullet)
         all_sprites.add(bullet)
-
-    def shot_gun(self, player):
-        for angle_offset in range(-30, 31, 15):
-            angle = math.atan2(player.rect.centery - self.rect.centery, player.rect.centerx - self.rect.centerx)
-            angle += math.radians(angle_offset)
-            dir_x = self.rect.centerx + math.cos(angle) * 10
-            dir_y = self.rect.centery + math.sin(angle) * 10
-            bullet = Bullet(self.rect.centerx, self.rect.centery, dir_x, dir_y, RED)
+        current_time = pygame.time.get_ticks()
+       
+        if not hasattr(self, 'last_shot_time'):
+            self.last_shot_time = 0
+        if current_time - self.last_shot_time > 500:
+            bullet = Bullet(self.rect.centerx, self.rect.centery, player.rect.centerx, player.rect.centery, RED)
             boss_bullets.add(bullet)
             all_sprites.add(bullet)
-
+            self.last_shot_time = current_time  
+    def shot_gun(self, player):
+        current_time = pygame.time.get_ticks()
+        if not hasattr(self, 'last_shot_time'):
+            self.last_shot_time = 0
+        if current_time - self.last_shot_time > 500:  # Delay of 0.5 seconds between bullets
+            for angle_offset in range(-30, 31, 15):
+                angle = math.atan2(player.rect.centery - self.rect.centery, player.rect.centerx - self.rect.centerx)
+                angle += math.radians(angle_offset)
+                dir_x = self.rect.centerx + math.cos(angle) * 10
+                dir_y = self.rect.centery + math.sin(angle) * 10
+                bullet = Bullet(self.rect.centerx, self.rect.centery, dir_x, dir_y, RED)
+                boss_bullets.add(bullet)
+                all_sprites.add(bullet)
+            self.last_shot_time = current_time
+   
     def update(self, player):
         current_time = pygame.time.get_ticks()
         if current_time - self.last_attack_time > self.attack_cooldown:
@@ -333,7 +346,8 @@ while running:
             if enemy.health <= 0:
                 enemy.kill()
         for boss in bosses:
-            boss.health -= 0.5
+            boss.health -= 0.01
+        
             if boss.health <= 0:
                 boss.kill()
 
@@ -361,7 +375,15 @@ while running:
         pygame.display.flip()
         pygame.time.wait(2000)
         running = False
-
+    if player.rect.x > 20000:
+        font = pygame.font.SysFont(None, 80)
+        text = font.render("YOU WIN", True, GREEN)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
+        dist_text = font.render(f"FINAL Distance: {player.rect.x - 100}", True, BLACK)
+        screen.blit(dist_text, (WIDTH // 2 - dist_text.get_width() // 2, HEIGHT // 2 + 100))
+        pygame.display.flip()
+        pygame.time.wait(2000)
+        running = False
     pygame.display.flip()
 
 pygame.quit()
