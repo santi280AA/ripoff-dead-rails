@@ -132,7 +132,7 @@ class MiniBoss(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.Surface((60, 60))
         self.image.fill(BROWN)
-        self.rect = self.image.get_rect(center=(random.randint(400, 1400), 500))
+        self.rect = self.image.get_rect(center=(random.randint(9999, 10000), 500))
         self.speed = 2
         self.health = 250
         self.damage = 25
@@ -174,6 +174,8 @@ class MiniBoss(pygame.sprite.Sprite):
             new_enemy.rect.y = self.rect.y + random.randint(-50, 50)
             enemies.add(new_enemy)
             all_sprites.add(new_enemy)
+            enemies.add(new_enemy)
+            all_sprites.add(new_enemy)
             self.last_summon_time = current_time
 
     def update(self, player):
@@ -188,15 +190,15 @@ class MiniBoss(pygame.sprite.Sprite):
             self.volley_shots(player)
         elif self.current_attack == "dash":
             self.dash()
-
-        if self.rect.x > player.rect.x:
-            self.rect.x -= self.speed
-        elif self.rect.x < player.rect.x:
-            self.rect.x += self.speed
-        if self.rect.y > player.rect.y:
-            self.rect.y -= self.speed
-        elif self.rect.y < player.rect.y:
-            self.rect.y += self.speed
+        if self.rect.x - player.rect.x < 1000:
+            if self.rect.x > player.rect.x:
+                self.rect.x -= self.speed
+            elif self.rect.x < player.rect.x:
+                self.rect.x += self.speed
+            if self.rect.y > player.rect.y:
+                self.rect.y -= self.speed
+            elif self.rect.y < player.rect.y:
+                self.rect.y += self.speed
 
         if self.rect.colliderect(player.rect):
             player.take_damage(self.damage)
@@ -252,18 +254,19 @@ class Boss(pygame.sprite.Sprite):
    
     def update(self, player):
         current_time = pygame.time.get_ticks()
-        if current_time - self.last_attack_time > self.attack_cooldown:
-            self.current_attack = random.choice(["dash", "shoot", "shot_gun"])
-            self.last_attack_time = current_time
-
-        if self.current_attack == "dash":
-            self.dash()
-        elif self.current_attack == "shoot":
-            self.shoot(player)
-        elif self.current_attack == "shot_gun":
-            self.shot_gun(player)
-
         if self.rect.x - player.rect.x < 5000:
+            if current_time - self.last_attack_time > self.attack_cooldown:
+                self.current_attack = random.choice(["dash", "shoot", "shot_gun"])
+                self.last_attack_time = current_time
+
+            if self.current_attack == "dash":
+                self.dash()
+            elif self.current_attack == "shoot":
+                self.shoot(player)
+            elif self.current_attack == "shot_gun":
+                self.shot_gun(player)
+
+        
             if self.rect.x > player.rect.x:
                 self.rect.x -= self.speed
             elif self.rect.x < player.rect.x:
@@ -286,6 +289,8 @@ class lever(pygame.sprite.Sprite):
 
     def update(self):
         if self.rect.colliderect(player.rect) and not self.activated:
+
+            
             print("Lever activated!")
             self.activated = True
             self.activation_time = pygame.time.get_ticks()
@@ -317,16 +322,16 @@ class GoldenArmor(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         self.image = pygame.image.load('armor.png')
-        self.image = pygame.transform.scale(self.image, (50, 50))
+        self.image = pygame.transform.scale(self.image, (40, 40))
         self.rect = self.image.get_rect(center=(x, y))
         self.collected = False
 
     def update(self, player):
         if not self.collected and self.rect.colliderect(player.rect):
             self.collected = True
-            player.max_health += 50
-            player.health = min(player.health + 50, player.max_health)
-            print("Golden Armor collected! Max health increased.")
+            player.max_health = 150
+            player.health = player.max_health
+            print(f"Armor collected! Max health: {player.max_health}")
             
         elif self.collected:
             # Make the armor follow the player
@@ -382,7 +387,7 @@ def draw_bandage(max_health):
     if current_time - draw_bandage.last_used_time > cooldown_time:
         if bandage_button.draw(screen):
             player.health += 25
-            if player.health > max_health:
+            if player.health > player.max_health:
                 player.health = 100
             draw_bandage.last_used_time = current_time
         else:
@@ -475,6 +480,7 @@ while running:
     miniboss.update(player)
     golden_armor_group.update(player)
     miniboss.update(player)
+    levers.update()
     # Player bullets hitting enemies
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, enemies, False)
