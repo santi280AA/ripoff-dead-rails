@@ -87,13 +87,23 @@ class molotov(pygame.sprite.Sprite):
             self.rect.x += self.dx
             self.rect.y += self.dy
             self.check_explosion()
+            if not self.explosion_start_time:
+                self.explosion_start_time = pygame.time.get_ticks()
         else:
             current_time = pygame.time.get_ticks()
             if current_time - self.explosion_start_time > self.explosion_time:
                 self.kill()
-
+    
     def check_explosion(self):
         hit_list = pygame.sprite.spritecollide(self, enemies, False)
+        hit_list_boss = pygame.sprite.spritecollide(self, bosses, False)
+        if hit_list or hit_list_boss or (pygame.time.get_ticks() - self.explosion_start_time > self.explosion_time):
+            self.explode()
+        
+    def check_explosion(self):
+    
+        hit_list = pygame.sprite.spritecollide(self, enemies, False)
+        
         hit_list_boss = pygame.sprite.spritecollide(self, bosses, False)
         if hit_list or hit_list_boss:
             self.explode()
@@ -109,12 +119,20 @@ class molotov(pygame.sprite.Sprite):
             self.rect = self.image.get_rect(center=self.rect.center)
             self.explosion_start_time = pygame.time.get_ticks()
 
-class boss(pygame.sprite.Sprite):
+            # Apply damage to bosses within the explosion radius
+            for boss in bosses:
+                if self.rect.colliderect(boss.rect):
+                    boss.health -= 50  # Adjust damage value as needed
+                    print(f"Boss hit by molotov! Health: {boss.health}")
+                    if boss.health <= 0:
+                        boss.kill()
+
+class Boss(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = pygame.Surface((80, 80))
         self.image.fill(RED)
-        self.rect = self.image.get_rect(center=(random.randint(1999, 2000), 500))
+        self.rect = self.image.get_rect(center=(random.randint(1999, 2000), 50000))
         self.speed = 2
         self.health = 200
         self.damage = 50
@@ -184,7 +202,45 @@ class boss(pygame.sprite.Sprite):
 
         if self.rect.colliderect(player.rect):
             player.take_damage(self.damage)
+class lever(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load('lever.png')
+        self.image = pygame.transform.scale(self.image, (70, 70))
+        self.rect = self.image.get_rect(center=(2000, 400))
+        self.activated = False
+        self.activation_time = None
 
+    def update(self):
+        if self.rect.colliderect(player.rect) and not self.activated:
+            print("Lever activated!")
+            self.activated = True
+            self.activation_time = pygame.time.get_ticks()
+            new_boss = Boss()
+            new_boss.rect.x = self.rect.x + 200
+            new_boss.rect.y = self.rect.y
+            bosses.add(new_boss)
+            all_sprites.add(new_boss)
+
+        if self.activated:
+            font = pygame.font.SysFont("Arial", 30)
+            current_time = pygame.time.get_ticks()
+            time_left = max(0, 60 - (current_time - self.activation_time) // 1000)
+            timer_text = font.render(f"{time_left}s", True, WHITE)
+            screen.blit(timer_text, (self.rect.x - offset_x, self.rect.y - 20))  # Adjusted for offset_x
+            print(f"Time left: {time_left}s")
+            if time_left == 0:
+                font = pygame.font.SysFont(None, 80)
+                text = font.render("YOU WIN", True, GREEN)
+                screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
+                dist_text = font.render(f"FINAL Distance: {player.rect.x - 100}", True, BLACK)
+                screen.blit(dist_text, (WIDTH // 2 - dist_text.get_width() // 2, HEIGHT // 2 + 100))
+                pygame.display.flip()
+                pygame.time.wait(2000)
+                global running
+                running = False
+           
+            
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -291,9 +347,10 @@ bullets = pygame.sprite.Group()
 boss_bullets = pygame.sprite.Group()
 molotovs = pygame.sprite.Group()
 all_sprites = pygame.sprite.Group(player, *enemies)
-bosses = pygame.sprite.Group([boss() for _ in range(1)])
+bosses = pygame.sprite.Group([Boss() for _ in range(1)])
 all_sprites.add(*bosses)
-
+levers = pygame.sprite.Group([lever() for _ in range(1)])
+all_sprites.add(*levers)
 # Main loop
 running = True
 while running:
@@ -315,7 +372,7 @@ while running:
     boss_bullets.update()
     molotovs.update()
     bosses.update(player)
-
+    levers.update()
     # Player bullets hitting enemies
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, enemies, False)
@@ -326,11 +383,12 @@ while running:
                 enemy.kill()
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, bosses, False)
-        for b in hit_list:
-            b.health -= 5
+        for boss in hit_list:
+            boss.health -= 5
+            print(f"Boss hit! Health: {boss.health}")
             bullet.kill()
-            if b.health <= 0:
-                b.kill()
+            if boss.health <= 0:
+                boss.kill()
 
     # Boss bullets hit player
     for bullet in boss_bullets:
@@ -346,10 +404,11 @@ while running:
             if enemy.health <= 0:
                 enemy.kill()
         for boss in bosses:
-            boss.health -= 0.01
-        
-            if boss.health <= 0:
-                boss.kill()
+            if m.rect.colliderect(boss.rect):  # Check if the molotov is within the boss's area
+                boss.health -= 0.05
+                print(f"Boss hit! Health: {boss.health}")
+                if boss.health <= 0:
+                    boss.kill()
 
     offset_x = max(0, player.rect.x - WIDTH // 2)
 
@@ -375,15 +434,7 @@ while running:
         pygame.display.flip()
         pygame.time.wait(2000)
         running = False
-    if player.rect.x > 20000:
-        font = pygame.font.SysFont(None, 80)
-        text = font.render("YOU WIN", True, GREEN)
-        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
-        dist_text = font.render(f"FINAL Distance: {player.rect.x - 100}", True, BLACK)
-        screen.blit(dist_text, (WIDTH // 2 - dist_text.get_width() // 2, HEIGHT // 2 + 100))
-        pygame.display.flip()
-        pygame.time.wait(2000)
-        running = False
+
     pygame.display.flip()
 
 pygame.quit()
