@@ -30,7 +30,8 @@ class Player(pygame.sprite.Sprite):
         self.speed = 20
         self.last_hit_time = 0
         self.hit_cooldown = 1000
-
+        self.max_health = 100
+        global max_health
     def update(self, keys):
         if keys[pygame.K_a]:
             self.rect.x -= self.speed
@@ -126,7 +127,79 @@ class molotov(pygame.sprite.Sprite):
                     print(f"Boss hit by molotov! Health: {boss.health}")
                     if boss.health <= 0:
                         boss.kill()
+class MiniBoss(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((60, 60))
+        self.image.fill(BROWN)
+        self.rect = self.image.get_rect(center=(random.randint(400, 1400), 500))
+        self.speed = 2
+        self.health = 250
+        self.damage = 25
+        self.last_attack_time = 0
+        self.attack_cooldown = 2000
+        self.current_attack = None
 
+    def dash(self):
+        dash_duration = 1000
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_attack_time < dash_duration:
+            self.rect.x += self.speed * 2 if self.rect.x < WIDTH else -self.speed * 2
+            self.rect.y += self.speed * 2 if self.rect.y < HEIGHT else -self.speed * 2
+        else:
+            self.speed = 2
+
+    def volley_shots(self, player):
+        current_time = pygame.time.get_ticks()
+        if not hasattr(self, 'last_shot_time'):
+            self.last_shot_time = 0
+        if current_time - self.last_shot_time > 1000:  # Delay of 1 second between volleys
+            for angle_offset in range(-60, 61, 30):  # Shoot bullets in a cone pattern
+                angle = math.atan2(player.rect.centery - self.rect.centery, player.rect.centerx - self.rect.centerx)
+                angle += math.radians(angle_offset)
+                dir_x = self.rect.centerx + math.cos(angle) * 10
+                dir_y = self.rect.centery + math.sin(angle) * 10
+                bullet = Bullet(self.rect.centerx, self.rect.centery, dir_x, dir_y, RED)
+                boss_bullets.add(bullet)
+                all_sprites.add(bullet)
+            self.last_shot_time = current_time
+
+    def summon(self):
+        current_time = pygame.time.get_ticks()
+        if not hasattr(self, 'last_summon_time'):
+            self.last_summon_time = 0
+        if current_time - self.last_summon_time > 2000:
+            new_enemy = Enemy()
+            new_enemy.rect.x = self.rect.x + random.randint(-50, 50)
+            new_enemy.rect.y = self.rect.y + random.randint(-50, 50)
+            enemies.add(new_enemy)
+            all_sprites.add(new_enemy)
+            self.last_summon_time = current_time
+
+    def update(self, player):
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_attack_time > self.attack_cooldown:
+            self.current_attack = random.choice(["dash", "volley_shots", "summon"])
+            self.last_attack_time = current_time
+
+        if self.current_attack == "summon":
+            self.summon()
+        elif self.current_attack == "volley_shots":
+            self.volley_shots(player)
+        elif self.current_attack == "dash":
+            self.dash()
+
+        if self.rect.x > player.rect.x:
+            self.rect.x -= self.speed
+        elif self.rect.x < player.rect.x:
+            self.rect.x += self.speed
+        if self.rect.y > player.rect.y:
+            self.rect.y -= self.speed
+        elif self.rect.y < player.rect.y:
+            self.rect.y += self.speed
+
+        if self.rect.colliderect(player.rect):
+            player.take_damage(self.damage)
 class Boss(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -207,7 +280,7 @@ class lever(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.image.load('lever.png')
         self.image = pygame.transform.scale(self.image, (70, 70))
-        self.rect = self.image.get_rect(center=(2000, 400))
+        self.rect = self.image.get_rect(center=(20000, 400))
         self.activated = False
         self.activation_time = None
 
@@ -240,6 +313,24 @@ class lever(pygame.sprite.Sprite):
                 global running
                 running = False
            
+class GoldenArmor(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.image.load('armor.png')
+        self.image = pygame.transform.scale(self.image, (50, 50))
+        self.rect = self.image.get_rect(center=(x, y))
+        self.collected = False
+
+    def update(self, player):
+        if not self.collected and self.rect.colliderect(player.rect):
+            self.collected = True
+            player.max_health += 50
+            player.health = min(player.health + 50, player.max_health)
+            print("Golden Armor collected! Max health increased.")
+            
+        elif self.collected:
+            # Make the armor follow the player
+            self.rect.center = player.rect.center
             
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
@@ -280,7 +371,7 @@ def draw_house():
     pygame.draw.rect(screen, BLUE, (320, 330 + offset_y, 40, 40))
     pygame.draw.rect(screen, BLUE, (440, 330 + offset_y, 40, 40))
 
-def draw_bandage():
+def draw_bandage(max_health):
     cooldown_time = 10000
     current_time = pygame.time.get_ticks()
     bandage_image = pygame.image.load('bandage.png')
@@ -291,7 +382,7 @@ def draw_bandage():
     if current_time - draw_bandage.last_used_time > cooldown_time:
         if bandage_button.draw(screen):
             player.health += 25
-            if player.health > 100:
+            if player.health > max_health:
                 player.health = 100
             draw_bandage.last_used_time = current_time
         else:
@@ -334,6 +425,12 @@ def draw_molotov():
                 molotovs.add(new_molotov)
                 all_sprites.add(new_molotov)
                 draw_molotov.last_used_time = current_time
+            if miniboss:
+                closest_miniboss = min(miniboss, key=lambda e: math.hypot(player.rect.centerx - e.rect.centerx, player.rect.centery - e.rect.centery))
+                new_molotov = molotov(player.rect.centerx, player.rect.centery, closest_miniboss.rect.centerx, closest_miniboss.rect.centery)
+                molotovs.add(new_molotov)
+                all_sprites.add(new_molotov)
+                draw_molotov.last_used_time = current_time
 
 # Initialize cooldowns
 draw_bandage.last_used_time = 0
@@ -341,6 +438,7 @@ draw_molotov.last_used_time = 0
 draw_snake_oil.last_used_time = 0
 
 # Groups
+golden_armor_group = pygame.sprite.Group()
 player = Player()
 enemies = pygame.sprite.Group([Enemy() for _ in range(5)])
 bullets = pygame.sprite.Group()
@@ -351,7 +449,9 @@ bosses = pygame.sprite.Group([Boss() for _ in range(1)])
 all_sprites.add(*bosses)
 levers = pygame.sprite.Group([lever() for _ in range(1)])
 all_sprites.add(*levers)
-# Main loop
+miniboss = pygame.sprite.Group([MiniBoss() for _ in range(1)])
+all_sprites.add(*miniboss)
+
 running = True
 while running:
     dt = clock.tick(60)
@@ -372,7 +472,9 @@ while running:
     boss_bullets.update()
     molotovs.update()
     bosses.update(player)
-    levers.update()
+    miniboss.update(player)
+    golden_armor_group.update(player)
+    miniboss.update(player)
     # Player bullets hitting enemies
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, enemies, False)
@@ -389,6 +491,21 @@ while running:
             bullet.kill()
             if boss.health <= 0:
                 boss.kill()
+    for bullet in bullets:
+        hit_list = pygame.sprite.spritecollide(bullet, miniboss, False)
+        for mini in hit_list:
+            mini.health -= 5
+            print(f"Miniboss hit! Health: {mini.health}")
+            bullet.kill()
+            if mini.health <= 0:
+                mini.kill()
+                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
+                all_sprites.add(golden_armor)
+                golden_armor_group.add(golden_armor)
+                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
+                all_sprites.add(golden_armor)
+                    
+                    
 
     # Boss bullets hit player
     for bullet in boss_bullets:
@@ -404,12 +521,22 @@ while running:
             if enemy.health <= 0:
                 enemy.kill()
         for boss in bosses:
-            if m.rect.colliderect(boss.rect):  # Check if the molotov is within the boss's area
+            if m.rect.colliderect(boss.rect):  # Check if molotov is near the boss
                 boss.health -= 0.05
                 print(f"Boss hit! Health: {boss.health}")
-                if boss.health <= 0:
-                    boss.kill()
-
+            if boss.health <= 0:
+                boss.kill()
+        for mini in miniboss:
+            mini.health -= 0.05
+            if m.rect.colliderect(mini.rect):  # Check if molotov is near the miniboss
+                print(f"Miniboss hit! Health: {mini.health}")
+            if mini.health <= 0:
+                mini.kill()
+                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
+                all_sprites.add(golden_armor)
+                golden_armor_group.add(golden_armor)
+                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
+                all_sprites.add(golden_armor)
     offset_x = max(0, player.rect.x - WIDTH // 2)
 
     screen.fill(BLACK)
@@ -418,7 +545,7 @@ while running:
     for sprite in all_sprites:
         screen.blit(sprite.image, (sprite.rect.x - offset_x, sprite.rect.y))
 
-    draw_bandage()
+    draw_bandage(max_health=100)
     draw_molotov()
     draw_snake_oil()
     pygame.draw.rect(screen, RED, (650, 10, 100, 10))
