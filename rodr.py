@@ -27,7 +27,7 @@ class Player(pygame.sprite.Sprite):
         self.image.fill(GREEN)
         self.rect = self.image.get_rect(center=(100, 500))
         self.health = 100
-        self.speed = 20
+        self.speed = 8
         self.last_hit_time = 0
         self.hit_cooldown = 1000
         self.max_health = 100
@@ -59,7 +59,7 @@ class Bullet(pygame.sprite.Sprite):
         self.image = pygame.Surface((5, 5))
         self.image.fill(color)
         self.rect = self.image.get_rect(center=(x, y))
-        self.velocity = 10
+        self.velocity = 15
         angle = math.atan2(target_y - y, target_x - x)
         self.dx = math.cos(angle) * self.velocity
         self.dy = math.sin(angle) * self.velocity
@@ -84,6 +84,7 @@ class molotov(pygame.sprite.Sprite):
         self.explosion_start_time = None
 
     def update(self):
+        
         if not self.exploded:
             self.rect.x += self.dx
             self.rect.y += self.dy
@@ -168,14 +169,13 @@ class MiniBoss(pygame.sprite.Sprite):
         current_time = pygame.time.get_ticks()
         if not hasattr(self, 'last_summon_time'):
             self.last_summon_time = 0
-        if current_time - self.last_summon_time > 2000:
+        if current_time - self.last_summon_time > 4000:
             new_enemy = Enemy()
             new_enemy.rect.x = self.rect.x + random.randint(-50, 50)
             new_enemy.rect.y = self.rect.y + random.randint(-50, 50)
             enemies.add(new_enemy)
             all_sprites.add(new_enemy)
-            enemies.add(new_enemy)
-            all_sprites.add(new_enemy)
+            
             self.last_summon_time = current_time
 
     def update(self, player):
@@ -343,7 +343,7 @@ class Enemy(pygame.sprite.Sprite):
         self.image = pygame.Surface((40, 40))
         self.image.fill(DARK_RED)
         self.rect = self.image.get_rect(center=(random.randint(400, 1400), 500))
-        self.speed = 2
+        self.speed = 5
         self.health = 50
         self.damage = 25
 
@@ -390,23 +390,30 @@ def draw_bandage(max_health):
             if player.health > player.max_health:
                 player.health = 100
             draw_bandage.last_used_time = current_time
-        else:
-            player.speed = 5
+        
 
 def draw_snake_oil():
     cooldown_time = 10000
+    boost_duration = 5000
     current_time = pygame.time.get_ticks()
     snake_oil_image = pygame.image.load('Snake_Oil.png')
     snake_oil_image = pygame.transform.scale(snake_oil_image, (50, 50))
     screen.blit(snake_oil_image, (130, 215 + offset_y))
     snake_oil_button = Button.Button(130, 215 + offset_y, snake_oil_image, True)
 
+    if not hasattr(draw_snake_oil, 'boost_active'):
+        draw_snake_oil.boost_active = False
+
     if current_time - draw_snake_oil.last_used_time > cooldown_time:
         if snake_oil_button.draw(screen):
-            player.speed = 8
-            draw_snake_oil.last_used_time = 0
-    else:
-        player.speed = 5
+            player.speed = 15
+            draw_snake_oil.last_used_time = current_time
+            draw_snake_oil.boost_active = True
+
+    if draw_snake_oil.boost_active and current_time - draw_snake_oil.last_used_time > boost_duration:
+        player.speed = 10
+        draw_snake_oil.boost_active = False
+           
 
 def draw_molotov():
     cooldown_time = 10000
@@ -459,7 +466,7 @@ all_sprites.add(*miniboss)
 
 running = True
 while running:
-    dt = clock.tick(60)
+    dt = clock.tick(30)
     keys = pygame.key.get_pressed()
 
     for event in pygame.event.get():
@@ -521,6 +528,11 @@ while running:
 
     # Molotov damage
     for m in molotovs:
+        # Check if molotov leaves the screen
+        if not pygame.Rect(offset_x, 0, WIDTH, HEIGHT).collidepoint(m.rect.center):
+            m.kill()
+            continue
+
         hit_list = pygame.sprite.spritecollide(m, enemies, False)
         for enemy in hit_list:
             enemy.health -= 0.5
@@ -533,16 +545,15 @@ while running:
             if boss.health <= 0:
                 boss.kill()
         for mini in miniboss:
-            mini.health -= 0.05
-            if m.rect.colliderect(mini.rect):  # Check if molotov is near the miniboss
+            if m.rect.colliderect(mini.rect):
+                m.explode()  # Call the explode method to trigger the explosion
+                mini.health -= 0.05
                 print(f"Miniboss hit! Health: {mini.health}")
-            if mini.health <= 0:
-                mini.kill()
-                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
-                all_sprites.add(golden_armor)
-                golden_armor_group.add(golden_armor)
-                golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
-                all_sprites.add(golden_armor)
+                if mini.health <= 0:
+                    mini.kill()
+                    golden_armor = GoldenArmor(mini.rect.centerx, mini.rect.centery)
+                    all_sprites.add(golden_armor)
+                    golden_armor_group.add(golden_armor)
     offset_x = max(0, player.rect.x - WIDTH // 2)
 
     screen.fill(BLACK)
