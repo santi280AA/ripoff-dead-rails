@@ -27,10 +27,14 @@ class Player(pygame.sprite.Sprite):
         self.image.fill(GREEN)
         self.rect = self.image.get_rect(center=(100, 500))
         self.health = 100
+        self.original_speed = 8
         self.speed = 8
         self.last_hit_time = 0
         self.hit_cooldown = 1000
         self.max_health = 100
+        self.bullet_damage = 5
+        self.classes = 0
+        self.class_type = ''
         global max_health
     def update(self, keys):
         if keys[pygame.K_a]:
@@ -346,7 +350,7 @@ class GoldenArmor(pygame.sprite.Sprite):
         elif self.collected:
             # Make the armor follow the player
             self.rect.center = player.rect.center
-            
+
 class Enemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -400,8 +404,66 @@ def draw_bandage(max_health):
             if player.health > player.max_health:
                 player.health = player.max_health
             draw_bandage.last_used_time = current_time
-        
+def draw_classes_stand():
+    classes_stand_image = pygame.image.load('classes.png')
+   
+    screen.blit(classes_stand_image, (20, 215 + offset_y))
+    classes_stand_button = Button.Button(20, 215 + offset_y, classes_stand_image, True)
+    if classes_stand_button.draw(screen):
+        print("Classes stand button clicked!")
+def draw_runner(player):
+    runner_image = pygame.image.load('runner_class.png')
+    runner_image = pygame.transform.scale(runner_image, (50, 50))
+    runner = pygame.sprite.Sprite()
+    runner.image = runner_image
+    runner.rect = runner_image.get_rect(center=(20, 400))
+    screen.blit(runner.image, (runner.rect.x - offset_x, runner.rect.y))
+    if player.rect.colliderect(runner.rect) and player.classes == 0:
+        player.original_speed = 10
+        player.speed = 10
+        player.classes =+1
+        player.class_type = 'runner'
+def draw_gunslinger():
+    gunslinger_image = pygame.image.load('gunslinger class.png')
+    gunslinger_image = pygame.transform.scale(gunslinger_image, (50, 50))
+    gunslinger = pygame.sprite.Sprite()
+    gunslinger.image = gunslinger_image
+    gunslinger.rect = gunslinger_image.get_rect(center=(20, 500))
+    screen.blit(gunslinger.image, (gunslinger.rect.x - offset_x, gunslinger.rect.y)) and player.classes == 0
+    if player.rect.colliderect(gunslinger.rect):
+        player.bullet_damage = 8
+        player.classes += 1
+        player.class_type = 'gunslinger'
+def draw_ironclad():
+    ironclad_image = pygame.image.load('armor_class.png')
+    ironclad_image = pygame.transform.scale(ironclad_image, (50, 50))
+    ironclad = pygame.sprite.Sprite()
+    ironclad.image = ironclad_image
+    ironclad.rect = ironclad_image.get_rect(center=(20, 300))
+    screen.blit(ironclad.image, (ironclad.rect.x - offset_x, ironclad.rect.y))
+    font = pygame.font.SysFont(None, 30)
+    text = font.render("Ironclad: +25 hp, -1 speed", True, WHITE)
+    screen.blit(text, (ironclad.rect.x - offset_x + 10, ironclad.rect.y - 30))
+    if not hasattr(player, 'armor_collected'):
+        player.armor_collected = False
+        player.armor = None
 
+    if player.rect.colliderect(ironclad.rect) and not player.armor_collected and player.classes == 0:
+        player.armor = pygame.sprite.Sprite()
+        player.armor.image = pygame.image.load('gray_armor.png')  # Load the correct armor image
+        player.armor.image = pygame.transform.scale(player.armor.image, (40, 40))  # Scale the image if needed
+        player.armor.rect = player.armor.image.get_rect(center=player.rect.center)  # Set the rect to match the player's position
+        player.speed = 7
+        player.original_speed = 7
+        player.max_health = 125
+        player.health = player.max_health
+        player.armor_collected = True
+        player.classes += 1
+        player.class_type = 'ironclad'
+    if player.armor_collected and player.armor:
+        # Ensure the armor stays with the player
+        player.armor.rect.center = player.rect.center
+        screen.blit(player.armor.image, (player.armor.rect.x - offset_x, player.armor.rect.y))
 def draw_snake_oil():
     cooldown_time = 10000
     boost_duration = 5000
@@ -416,12 +478,12 @@ def draw_snake_oil():
 
     if current_time - draw_snake_oil.last_used_time > cooldown_time:
         if snake_oil_button.draw(screen):
-            player.speed = 15
+            player.speed += 5
             draw_snake_oil.last_used_time = current_time
             draw_snake_oil.boost_active = True
 
     if draw_snake_oil.boost_active and current_time - draw_snake_oil.last_used_time > boost_duration:
-        player.speed = 10
+        player.speed = player.original_speed
         draw_snake_oil.boost_active = False
            
 
@@ -503,14 +565,14 @@ while running:
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, enemies, False)
         for enemy in hit_list:
-            enemy.health -= 5
+            enemy.health -= player.bullet_damage
             bullet.kill()
             if enemy.health <= 0:
                 enemy.kill()
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, bosses, False)
         for boss in hit_list:
-            boss.health -= 5
+            boss.health -= player.bullet_damage
             print(f"Boss hit! Health: {boss.health}")
             bullet.kill()
             if boss.health <= 0:
@@ -518,7 +580,7 @@ while running:
     for bullet in bullets:
         hit_list = pygame.sprite.spritecollide(bullet, miniboss, False)
         for mini in hit_list:
-            mini.health -= 5
+            mini.health -= player.bullet_damage
             print(f"Miniboss hit! Health: {mini.health}")
             bullet.kill()
             if mini.health <= 0:
@@ -572,10 +634,13 @@ while running:
     draw_house()
     for sprite in all_sprites:
         screen.blit(sprite.image, (sprite.rect.x - offset_x, sprite.rect.y))
-
+    draw_runner(player)
     draw_bandage(max_health=100)
     draw_molotov()
     draw_snake_oil()
+    draw_gunslinger()
+    draw_classes_stand()
+    draw_ironclad()
     for boss in bosses:
         if boss.rect.x - player.rect.x < 1000:
             text = pygame.font.SysFont(None, 40).render("Nikoli Tesla", True, WHITE)
@@ -599,7 +664,9 @@ while running:
     pygame.draw.rect(screen, RED, (650, 10, 100, 10))
     pygame.draw.rect(screen, GREEN, (650, 10, max(player.health, 0), 10))
     pygame.draw.rect(screen, YELLOW, (650, 25, 100, 10))
-
+    font = pygame.font.SysFont(None, 30)
+    class_text = font.render(f"Classes: {player.class_type}", True, WHITE)
+    screen.blit(class_text, (600, 50))
     if player.health <= 0:
         font = pygame.font.SysFont(None, 80)
         text = font.render("GAME OVER", True, RED)
