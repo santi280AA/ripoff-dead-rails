@@ -207,9 +207,9 @@ class Boss(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.Surface((80, 80))
         self.image.fill(RED)
-        self.rect = self.image.get_rect(center=(random.randint(1999, 2000), 50000))
+        self.rect = self.image.get_rect(center=(random.randint(1999999, 2000000), 500))
         self.speed = 2
-        self.health = 200
+        self.health = 500
         self.damage = 50
         self.last_attack_time = 0
         self.attack_cooldown = 2000
@@ -253,12 +253,18 @@ class Boss(pygame.sprite.Sprite):
             self.last_shot_time = current_time
    
     def update(self, player):
+        health_bar_width = 100
+        health_bar_height = 10
+        health_ratio = max(0, self.health / 500)  # Assuming max health is 500
+        health_bar_fill = int(health_bar_width * health_ratio)
         current_time = pygame.time.get_ticks()
-        if self.rect.x - player.rect.x < 5000:
+        if self.rect.x - player.rect.x < 1000:
+            pygame.draw.rect(screen, RED, (WIDTH // 2 - health_bar_width // 2, 10, health_bar_width, health_bar_height))
+            pygame.draw.rect(screen, GREEN, (WIDTH // 2 - health_bar_width // 2, 10, health_bar_fill, health_bar_height))
             if current_time - self.last_attack_time > self.attack_cooldown:
                 self.current_attack = random.choice(["dash", "shoot", "shot_gun"])
                 self.last_attack_time = current_time
-
+                
             if self.current_attack == "dash":
                 self.dash()
             elif self.current_attack == "shoot":
@@ -266,7 +272,6 @@ class Boss(pygame.sprite.Sprite):
             elif self.current_attack == "shot_gun":
                 self.shot_gun(player)
 
-        
             if self.rect.x > player.rect.x:
                 self.rect.x -= self.speed
             elif self.rect.x < player.rect.x:
@@ -278,6 +283,11 @@ class Boss(pygame.sprite.Sprite):
 
         if self.rect.colliderect(player.rect):
             player.take_damage(self.damage)
+
+        # Draw health bar
+        
+            
+            
 class lever(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
@@ -388,7 +398,7 @@ def draw_bandage(max_health):
         if bandage_button.draw(screen):
             player.health += 25
             if player.health > player.max_health:
-                player.health = 100
+                player.health = player.max_health
             draw_bandage.last_used_time = current_time
         
 
@@ -484,6 +494,7 @@ while running:
     boss_bullets.update()
     molotovs.update()
     bosses.update(player)
+    
     miniboss.update(player)
     golden_armor_group.update(player)
     miniboss.update(player)
@@ -547,7 +558,7 @@ while running:
         for mini in miniboss:
             if m.rect.colliderect(mini.rect):
                 m.explode()  # Call the explode method to trigger the explosion
-                mini.health -= 0.05
+                mini.health -= 0.15
                 print(f"Miniboss hit! Health: {mini.health}")
                 if mini.health <= 0:
                     mini.kill()
@@ -565,6 +576,26 @@ while running:
     draw_bandage(max_health=100)
     draw_molotov()
     draw_snake_oil()
+    for boss in bosses:
+        if boss.rect.x - player.rect.x < 1000:
+            text = pygame.font.SysFont(None, 40).render("Nikoli Tesla", True, WHITE)
+            screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 25 - 20))
+            health_bar_width = 400
+            health_bar_height = 50
+            health_ratio = max(0, boss.health / 500)  # Assuming max health is 500
+            health_bar_fill = int(health_bar_width * health_ratio)
+            pygame.draw.rect(screen, BLACK, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_width, health_bar_height))
+            pygame.draw.rect(screen, GREEN, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_fill, health_bar_height))
+    for mini in miniboss:
+        if mini.rect.x - player.rect.x < 1000:
+            text = pygame.font.SysFont(None, 40).render("The Summoner", True, WHITE)
+            screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 25 - 20))
+            health_bar_width = 400
+            health_bar_height = 50
+            health_ratio = max(0, mini.health / 250)
+            health_bar_fill = int(health_bar_width * health_ratio)
+            pygame.draw.rect(screen, BLACK, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_width, health_bar_height))
+            pygame.draw.rect(screen, RED, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_fill, health_bar_height))
     pygame.draw.rect(screen, RED, (650, 10, 100, 10))
     pygame.draw.rect(screen, GREEN, (650, 10, max(player.health, 0), 10))
     pygame.draw.rect(screen, YELLOW, (650, 25, 100, 10))
