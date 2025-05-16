@@ -319,7 +319,7 @@ class lever(pygame.sprite.Sprite):
             current_time = pygame.time.get_ticks()
             time_left = max(0, 60 - (current_time - self.activation_time) // 1000)
             timer_text = font.render(f"{time_left}s", True, WHITE)
-            screen.blit(timer_text, (self.rect.x - offset_x, self.rect.y - 20))  # Adjusted for offset_x
+            screen.blit(timer_text, (20000 - offset_x, 380))  # Adjusted for offset_x
             print(f"Time left: {time_left}s")
             if time_left == 0:
                 font = pygame.font.SysFont(None, 80)
@@ -356,23 +356,24 @@ class Enemy(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.Surface((40, 40))
         self.image.fill(DARK_RED)
-        self.rect = self.image.get_rect(center=(random.randint(400, 1400), 500))
+        self.rect = self.image.get_rect(center=(random.randint(2000, 19999), 500))
         self.speed = 5
         self.health = 50
         self.damage = 25
 
     def update(self, player):
-        if self.rect.x > player.rect.x:
-            self.rect.x -= self.speed
-        elif self.rect.x < player.rect.x:
-            self.rect.x += self.speed
-        if self.rect.y > player.rect.y:
-            self.rect.y -= self.speed
-        elif self.rect.y < player.rect.y:
-            self.rect.y += self.speed
+        if self.rect.x - player.rect.x < 1000:
+            if self.rect.x > player.rect.x:
+                self.rect.x -= self.speed
+            elif self.rect.x < player.rect.x:
+                self.rect.x += self.speed
+            if self.rect.y > player.rect.y:
+                self.rect.y -= self.speed
+            elif self.rect.y < player.rect.y:
+                self.rect.y += self.speed
 
-        if self.rect.colliderect(player.rect):
-            player.take_damage(self.damage)
+            if self.rect.colliderect(player.rect):
+                player.take_damage(self.damage)
 
 def draw_train_background(offset_x):
     train_surface = pygame.Surface((20000, HEIGHT))
@@ -390,6 +391,38 @@ def draw_house():
     pygame.draw.rect(screen, BLUE, (320, 330 + offset_y, 40, 40))
     pygame.draw.rect(screen, BLUE, (440, 330 + offset_y, 40, 40))
 
+def draw_castle(offset_x):
+    castle_x = 15000 - offset_x
+    GRAY = (169, 169, 169)
+
+    pygame.draw.rect(screen, GRAY, (castle_x, 200, 400, 400))
+    pygame.draw.rect(screen, GRAY, (castle_x - 50, 150, 100, 450))
+    pygame.draw.rect(screen, GRAY, (castle_x + 350, 150, 100, 450))
+
+    pygame.draw.polygon(screen, DARK_RED, [(castle_x - 60, 150), (castle_x + 50, 80), (castle_x + 160, 150)])
+    pygame.draw.polygon(screen, DARK_RED, [(castle_x + 340, 150), (castle_x + 450, 80), (castle_x + 560, 150)])
+
+    pygame.draw.rect(screen, BROWN, (castle_x + 175, 450, 50, 150))
+    pygame.draw.rect(screen, BLUE, (castle_x + 50, 300, 40, 60))
+    pygame.draw.rect(screen, BLUE, (castle_x + 310, 300, 40, 60))
+
+offset_y = -200
+def draw_castle_interior():
+    screen.fill((30, 30, 30))  # Dark stone walls
+    pygame.draw.rect(screen, (60, 60, 60), (0, 500, WIDTH, 100))  # Floor
+
+    for i in range(3):
+        pygame.draw.rect(screen, BLUE, (150 + i * 200, 100, 50, 100))
+
+    for i in range(2):
+        pygame.draw.rect(screen, (139, 69, 19), (100 + i * 500, 300, 20, 60))  # Torch stand
+        pygame.draw.circle(screen, (255, 140, 0), (110 + i * 500, 300), 15)    # Flame
+
+    # vampfire
+    pygame.draw.rect(screen, RED, (WIDTH//2 - 40, 400, 80, 100))
+    pygame.draw.rect(screen, GOLD := (255, 215, 0), (WIDTH//2 - 30, 380, 60, 20))  # Throne head
+   
+
 def draw_bandage(max_health):
     cooldown_time = 10000
     current_time = pygame.time.get_ticks()
@@ -404,42 +437,58 @@ def draw_bandage(max_health):
             if player.health > player.max_health:
                 player.health = player.max_health
             draw_bandage.last_used_time = current_time
-def draw_classes_stand():
-    classes_stand_image = pygame.image.load('classes.png')
-   
-    screen.blit(classes_stand_image, (20, 215 + offset_y))
-    classes_stand_button = Button.Button(20, 215 + offset_y, classes_stand_image, True)
-    if classes_stand_button.draw(screen):
-        print("Classes stand button clicked!")
+class ClassesStand(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.image.load('classes.png')
+        self.image = pygame.transform.scale(self.image, (256, 256))
+        self.rect = self.image.get_rect(center=(x, y))
+
+    def update(self):
+        
+        pass
+    
 def draw_runner(player):
     runner_image = pygame.image.load('runner_class.png')
     runner_image = pygame.transform.scale(runner_image, (50, 50))
     runner = pygame.sprite.Sprite()
     runner.image = runner_image
-    runner.rect = runner_image.get_rect(center=(20, 400))
+    runner.rect = runner_image.get_rect(center=(200, 325))
     screen.blit(runner.image, (runner.rect.x - offset_x, runner.rect.y))
+    font = pygame.font.SysFont(None, 30)
+    text = font.render("Runner: +2 speed", True, WHITE)
+    screen.blit(text, (runner.rect.x - offset_x - 100, runner.rect.y - 30))
     if player.rect.colliderect(runner.rect) and player.classes == 0:
-        player.original_speed = 10
-        player.speed = 10
-        player.classes =+1
+        player.original_speed = 30
+        player.speed = 30
+        player.classes += 1
         player.class_type = 'runner'
-def draw_gunslinger():
+
+def draw_gunslinger(player):
     gunslinger_image = pygame.image.load('gunslinger class.png')
     gunslinger_image = pygame.transform.scale(gunslinger_image, (50, 50))
     gunslinger = pygame.sprite.Sprite()
     gunslinger.image = gunslinger_image
-    gunslinger.rect = gunslinger_image.get_rect(center=(20, 500))
-    screen.blit(gunslinger.image, (gunslinger.rect.x - offset_x, gunslinger.rect.y)) and player.classes == 0
-    if player.rect.colliderect(gunslinger.rect):
+    gunslinger.rect = gunslinger_image.get_rect(center=(400, 325))
+    screen.blit(gunslinger.image, (gunslinger.rect.x - offset_x, gunslinger.rect.y))
+    font = pygame.font.SysFont(None, 30)
+    text = font.render("gunslinger: +3 bullet damage", True, WHITE)
+    screen.blit(text, (gunslinger.rect.x - offset_x + -100, gunslinger.rect.y - 30))
+    if player.rect.colliderect(gunslinger.rect) and player.classes == 0:
         player.bullet_damage = 8
         player.classes += 1
         player.class_type = 'gunslinger'
-def draw_ironclad():
+    if player.rect.colliderect(gunslinger.rect) and player.classes == 0:
+        player.bullet_damage = 8
+        player.classes += 1
+        player.class_type = 'gunslinger'
+       
+def draw_ironclad(player):
     ironclad_image = pygame.image.load('armor_class.png')
     ironclad_image = pygame.transform.scale(ironclad_image, (50, 50))
     ironclad = pygame.sprite.Sprite()
     ironclad.image = ironclad_image
-    ironclad.rect = ironclad_image.get_rect(center=(20, 300))
+    ironclad.rect = ironclad_image.get_rect(center=(600, 325))
     screen.blit(ironclad.image, (ironclad.rect.x - offset_x, ironclad.rect.y))
     font = pygame.font.SysFont(None, 30)
     text = font.render("Ironclad: +25 hp, -1 speed", True, WHITE)
@@ -515,6 +564,38 @@ def draw_molotov():
                 molotovs.add(new_molotov)
                 all_sprites.add(new_molotov)
                 draw_molotov.last_used_time = current_time
+def draw_castle(offset_x):
+    castle_x = 15000 - offset_x
+    GRAY = (169, 169, 169)
+
+    pygame.draw.rect(screen, GRAY, (castle_x, 200, 400, 400))
+    pygame.draw.rect(screen, GRAY, (castle_x - 50, 150, 100, 450))
+    pygame.draw.rect(screen, GRAY, (castle_x + 350, 150, 100, 450))
+
+    pygame.draw.polygon(screen, DARK_RED, [(castle_x - 60, 150), (castle_x + 50, 80), (castle_x + 160, 150)])
+    pygame.draw.polygon(screen, DARK_RED, [(castle_x + 340, 150), (castle_x + 450, 80), (castle_x + 560, 150)])
+
+    pygame.draw.rect(screen, BROWN, (castle_x + 175, 450, 50, 150))
+    pygame.draw.rect(screen, BLUE, (castle_x + 50, 300, 40, 60))
+    pygame.draw.rect(screen, BLUE, (castle_x + 310, 300, 40, 60))
+
+offset_y = -200
+def draw_castle_interior():
+    screen.fill((30, 30, 30))  # Dark stone walls
+    pygame.draw.rect(screen, (60, 60, 60), (0, 500, WIDTH, 100))  # Floor
+
+    for i in range(3):
+        pygame.draw.rect(screen, BLUE, (150 + i * 200, 100, 50, 100))
+
+    for i in range(2):
+        pygame.draw.rect(screen, (139, 69, 19), (100 + i * 500, 300, 20, 60))  # Torch stand
+        pygame.draw.circle(screen, (255, 140, 0), (110 + i * 500, 300), 15)    # Flame
+
+    # Throne
+    pygame.draw.rect(screen, RED, (WIDTH//2 - 40, 400, 80, 100))
+    pygame.draw.rect(screen, GOLD := (255, 215, 0), (WIDTH//2 - 30, 380, 60, 20))  # Throne head
+   
+
 
 # Initialize cooldowns
 draw_bandage.last_used_time = 0
@@ -535,7 +616,8 @@ levers = pygame.sprite.Group([lever() for _ in range(1)])
 all_sprites.add(*levers)
 miniboss = pygame.sprite.Group([MiniBoss() for _ in range(1)])
 all_sprites.add(*miniboss)
-
+class_stand = ClassesStand(400, 150)
+all_sprites.add(class_stand)
 running = True
 while running:
     dt = clock.tick(30)
@@ -556,7 +638,7 @@ while running:
     boss_bullets.update()
     molotovs.update()
     bosses.update(player)
-    
+
     miniboss.update(player)
     golden_armor_group.update(player)
     miniboss.update(player)
@@ -628,7 +710,8 @@ while running:
                     all_sprites.add(golden_armor)
                     golden_armor_group.add(golden_armor)
     offset_x = max(0, player.rect.x - WIDTH // 2)
-
+    
+    
     screen.fill(BLACK)
     draw_train_background(offset_x)
     draw_house()
@@ -638,9 +721,9 @@ while running:
     draw_bandage(max_health=100)
     draw_molotov()
     draw_snake_oil()
-    draw_gunslinger()
-    draw_classes_stand()
-    draw_ironclad()
+    draw_gunslinger(player)
+    draw_castle(offset_x)
+    draw_ironclad(player)
     for boss in bosses:
         if boss.rect.x - player.rect.x < 1000:
             text = pygame.font.SysFont(None, 40).render("Nikoli Tesla", True, WHITE)
@@ -661,11 +744,12 @@ while running:
             health_bar_fill = int(health_bar_width * health_ratio)
             pygame.draw.rect(screen, BLACK, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_width, health_bar_height))
             pygame.draw.rect(screen, RED, (WIDTH // 2 - health_bar_width // 2, HEIGHT // 20, health_bar_fill, health_bar_height))
+
     pygame.draw.rect(screen, RED, (650, 10, 100, 10))
     pygame.draw.rect(screen, GREEN, (650, 10, max(player.health, 0), 10))
     pygame.draw.rect(screen, YELLOW, (650, 25, 100, 10))
     font = pygame.font.SysFont(None, 30)
-    class_text = font.render(f"Classes: {player.class_type}", True, WHITE)
+    class_text = font.render(f"Class: {player.class_type}", True, WHITE)
     screen.blit(class_text, (600, 50))
     if player.health <= 0:
         font = pygame.font.SysFont(None, 80)
